@@ -1,5 +1,6 @@
 import urllib.request
 import os
+# import sys
 import tarfile
 import re
 from keras.preprocessing import sequence
@@ -11,6 +12,8 @@ from keras.callbacks import EarlyStopping
 from keras.layers import Bidirectional
 from keras.layers.recurrent import SimpleRNN
 from keras.layers.recurrent import LSTM
+import matplotlib.pyplot as plt
+
 
 data_path = r"data/aclImdb/"
 
@@ -100,11 +103,16 @@ def create_model(model_type):
         model.add(SimpleRNN(units=16))
     elif model_type == 'LSTM':
         model.add(LSTM(32))
+    elif model_type == 'BLSTM':
+        model.add(Bidirectional(LSTM(units=32, return_sequences=True), merge_mode='concat'))
+    elif model_type == 'DBLSTM':
+        model.add(Bidirectional(LSTM(units=32, return_sequences=True), merge_mode='concat'))		
+        model.add(LSTM(32))
 
     if model_type == 'DBRNN':
         model.add(SimpleRNN(units=8))
 
-    if model_type == 'BRNN' or model_type == 'MLP':
+    if model_type == 'BRNN' or model_type == 'BLSTM' or model_type == 'MLP':
         model.add(Flatten())
 
     model.add(Dense(units=256, activation='relu'))
@@ -112,7 +120,36 @@ def create_model(model_type):
 
     model.add(Dense(units=1, activation='sigmoid'))
 
+    model.compile(loss='binary_crossentropy',
+                  optimizer='adam',
+                  metrics=['accuracy'])
+
     return model
+
+
+def plot_result(history):
+    # plot acc
+    # fig = plt.figure()
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.title('Model accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    plt.savefig('acc.png')
+    # plt.show()
+    plt.close()
+
+    # plot loss
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    plt.savefig('loss.png')
+    # plt.show()
+    plt.close()
 
 
 def start_train():
@@ -137,28 +174,30 @@ def start_train():
 
     # model = create_model('MLP')
     # model = create_model('RNN')
-    model = create_model('BRNN')
+    # model = create_model('BRNN')
     # model = create_model('DBRNN')
     # model = create_model('LSTM')
-
-    model.compile(loss='binary_crossentropy',
-                  optimizer='adam',
-                  metrics=['accuracy'])
+    # model = create_model('BLSTM')
+    model = create_model('DBLSTM')
 
     es = EarlyStopping(monitor='val_acc', patience=5, verbose=0, mode='auto')
-    model.fit(x_train, y_train,
-              batch_size=100,
-              epochs=10,
-              verbose=2,
-              validation_split=0.2,
-              # callbacks=[es],
-              shuffle=True)
+    history = model.fit(x_train, y_train,
+                        batch_size=100,
+                        epochs=20,
+                        verbose=2,
+                        validation_split=0.2,
+                        # callbacks=[es],
+                        shuffle=True)
 
+    plot_result(history)
     scores = model.evaluate(x_test, y_test, verbose=1)
     print(scores[1])
 
 
 if __name__ == '__main__':
+    # current_path = os.getcwd()
+    # os.chdir(os.path.split(sys.argv[0])[0])
+    # print(os.getcwd())
     get_imdb_data_and_unzip()
     start_train()
-
+    # os.chdir(current_path)
